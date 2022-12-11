@@ -20,8 +20,10 @@ class Puller:
         try:
             actor = Actor.objects.get(pk=actor_json["id"])
         except:
-            actor = Actor.objects.create()
-            actor.id, actor.url = actor_json["id"], actor_json["url"]
+            actor = Actor(
+                id = actor_json["id"],
+                url = actor_json["url"]
+            )
             actor.save()
         return actor
 
@@ -30,8 +32,11 @@ class Puller:
         try:
             repo = Repo.objects.get(pk=repo_json["id"])
         except:
-            repo = Repo.objects.create()
-            repo.id, repo.full_name, repo.url = repo_json["id"], repo_json["name"], repo_json["url"]
+            repo = Repo(
+                id = repo_json["id"],
+                full_name = repo_json["name"],
+                url = repo_json["url"]
+            )
             repo.save()
         return repo
 
@@ -42,8 +47,10 @@ class Puller:
             try:
                 repo = Watched.objects.get(pk=repo_path)
             except:
-                repo = Watched.objects.create()
-                repo.repo_path, repo.updated_till = repo_path, datetime.date(2015, 1, 1)
+                repo = Watched(
+                    repo_path = repo_path,
+                    updated_till = datetime.date(2015, 1, 1)
+                )
                 repo.save()
             repos.append(repo)
         return repos
@@ -60,7 +67,7 @@ class Puller:
     def pull_event_data(self, repo_paths, from_date, to_date=datetime.date.today()):
         events, date, success = [], from_date, True
         while date < to_date:
-            for h in range(0, 24):
+            for h in range(0, 23):
                 f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
                 url = f"https://data.gharchive.org/{f_name}.gz"
 
@@ -99,7 +106,7 @@ class Puller:
             repos = Puller.get_watched_repos(repo_paths)
             for repo in repos:
                 repo.updated_till = date
-            Watched.objects.bulk_update(objs, ['updated_till'])
+                repo.save()
 
         return date, objs
 

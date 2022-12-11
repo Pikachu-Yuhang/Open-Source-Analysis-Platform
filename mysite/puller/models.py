@@ -22,15 +22,21 @@ class Repo(models.Model):
 class Event(models.Model):
     class EventType(models.TextChoices):
         CommitCommentEvent = 'CC'
+        CreateEvent = 'C'
+        DeleteEvent = 'D'
         ForkEvent = 'F'
+        GollumEvent = 'G'
         IssueCommentEvent = 'IC'
         IssuesEvent = 'I'
         MemberEvent = 'M'
+        PublicEvent = 'Pub'
         PullRequestEvent = 'PR'
         PullRequestReviewEvent = 'PRR'
         PullRequestReviewCommentEvent = 'PRRC'
         PullRequestReviewThreadEvent = 'PRRT'
         PushEvent = 'P'
+        ReleaseEvent = 'R'
+        SponsorshipEvent = 'S'
         WatchEvent = 'W'
 
     event_type = models.CharField(
