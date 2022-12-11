@@ -52,3 +52,4 @@ class Event(models.Model):
         on_delete=models.CASCADE,
     )
     payload = models.TextField()
+    created_at = models.DateTimeField()

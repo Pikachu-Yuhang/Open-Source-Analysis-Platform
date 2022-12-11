@@ -10,7 +10,7 @@ class Puller:
     class AppURLopener(request.FancyURLopener):
         version = "Wget/1.21.2"
 
-    def __init__(self, limit=1000):
+    def __init__(self, limit=500):
         self.opener = Puller.AppURLopener()
         self.limit = limit
 
@@ -59,7 +59,8 @@ class Puller:
             event_type = Event.EventType[event["type"]],
             actor = Puller.get_actor(event["actor"]),
             repo = Puller.get_repo(event["repo"]),
-            payload = event["payload"]
+            payload = event["payload"],
+            created_at = event["created_at"]
         )
         return e
 
