@@ -3,20 +3,20 @@ from django.db import models
 # Create your models here.
 
 class Watched(models.Model):
-    repo_path = models.CharField('path')
-    updated_till = models.DateField('date')
+    repo_path = models.CharField(max_length=63, primary_key=True)
+    updated_till = models.DateField()
 
 
 class Actor(models.Model):
-    id = models.CharField(primary_key=True)
-    company = models.CharField()
-    url = models.CharField()
+    id = models.CharField(max_length=31, primary_key=True)
+    company = models.CharField(max_length=63)
+    url = models.CharField(max_length=255)
 
 
 class Repo(models.Model):
-    id = models.CharField(primary_key=True)
-    full_name = models.CharField()
-    url = models.CharField()
+    id = models.CharField(max_length=31, primary_key=True)
+    full_name = models.CharField(max_length=63)
+    url = models.CharField(max_length=255)
 
 
 class Event(models.Model):
