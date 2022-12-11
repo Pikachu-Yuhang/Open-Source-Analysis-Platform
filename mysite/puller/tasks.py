@@ -10,10 +10,9 @@ class Puller:
     class AppURLopener(request.FancyURLopener):
         version = "Wget/1.21.2"
 
-    def __init__(self, limit=1000, max_retry=100):
+    def __init__(self, limit=1000):
         self.opener = Puller.AppURLopener()
         self.limit = limit
-        self.max_retry = max_retry
 
     def get_actor(actor_json):
         actor = None
@@ -64,22 +63,19 @@ class Puller:
         )
         return e
 
-    def pull_event_data(self, repo_paths, from_date, to_date=datetime.date.today()):
+    def pull_event_data(self, repo_paths, from_date, to_date):
         events, date, success = [], from_date, True
         while date < to_date:
             for h in range(0, 23):
                 f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
                 url = f"https://data.gharchive.org/{f_name}.gz"
 
-                response, retry_cnt = None, 0
-                while response is None and retry_cnt < self.max_retry:
+                response = None
+                while response is None:
                     try:
                         response = self.opener.open(url)
                     except:
-                        retry_cnt += 1
-                if response is None:
-                    success = False
-                    break
+                        pass
                 result = gzip.decompress(response.read()).decode("utf-8")
                 event_json = ""
                 for line in result.splitlines():
@@ -92,44 +88,18 @@ class Puller:
                     except:
                         pass
                 print(f"{url} done")
-            if not success:
-                break
-            else:
-                print(f"{date} done: {len(events)} events")
-                date += datetime.timedelta(days=1)
-                if len(events) > self.limit:
-                    break
-        objs = []
-        if success:
-            objs = Event.objects.bulk_create(events)
-
+            print(f"{date} done: {len(events)} events")
+            date += datetime.timedelta(days=1)
+            if len(events) > self.limit:
+                Event.objects.bulk_create(events)
+                events = []
             repos = Puller.get_watched_repos(repo_paths)
             for repo in repos:
                 repo.updated_till = date
                 repo.save()
 
-        return date, objs
-
-
-# def group_repos(repo_entries):
-#     return [([repo], repo.updated_till) for repo in repo_entries]
-
-
-# @shared_task
-# def pull_data_beat():
-#     all_entries = Watched.objects.all()
-#     puller = Puller()
-
-#     groups = group_repos(all_entries)
-#     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-#         futs = [executor.submit(puller.pull_event_data, [repo.repo_path for repo in repos], start) for (repos, start) in groups]
-#         for fut in concurrent.futures.as_completed(futs):
-#             pass
-
 
 @shared_task
-def pull_data(repo_paths, from_date=datetime.date(2015, 1, 1)):
+def pull_data(repo_paths, from_date, to_date):
     puller = Puller()
-    date, end_date = from_date, datetime.date.today()
-    while date < end_date:
-        date, _ = puller.pull_event_data(repo_paths, from_date, end_date)
+    puller.pull_event_data(repo_paths, from_date, to_date)

@@ -140,8 +140,4 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379'
 CELERY_TASK_SERIALIZER = 'json'
 
 CELERY_BEAT_SCHEDULE = {
-    # 'pull-data-every-day': {
-    #    'task': 'puller.tasks.pull_data_beat',
-    #    'schedule': 60 * 60 * 24,
-    # },
 }
