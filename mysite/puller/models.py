@@ -2,9 +2,9 @@ from django.db import models
 
 # Create your models here.
 
-class Watched(models.Model):
-    repo_path = models.CharField(max_length=63, primary_key=True)
-    updated_till = models.DateField()
+class Batch(models.Model):
+    repo_paths = models.TextField() # array of size m
+    time_intervals = models.TextField() # array of size n * 2
 
 
 class Actor(models.Model):
@@ -21,27 +21,29 @@ class Repo(models.Model):
 
 class Event(models.Model):
     class EventType(models.TextChoices):
-        CommitCommentEvent = 'CC'
-        CreateEvent = 'C'
-        DeleteEvent = 'D'
-        ForkEvent = 'F'
-        GollumEvent = 'G'
-        IssueCommentEvent = 'IC'
-        IssuesEvent = 'I'
-        MemberEvent = 'M'
-        PublicEvent = 'Pub'
-        PullRequestEvent = 'PR'
-        PullRequestReviewEvent = 'PRR'
-        PullRequestReviewCommentEvent = 'PRRC'
-        PullRequestReviewThreadEvent = 'PRRT'
-        PushEvent = 'P'
-        ReleaseEvent = 'R'
-        SponsorshipEvent = 'S'
-        WatchEvent = 'W'
+        Fork = 'F',
+        Issue = 'I',
+        Member = 'M'
+        Push = 'P',
+        PullRequest = 'PR',
+        Watch = 'W'
+    class Action(models.TextChoices):
+        Added = 'A',
+        Commented = 'Co',
+        Closed = 'Cl',
+        Opened = 'O',
+        Removed = 'Rm',
+        Reviewed = 'Rv'
 
-    event_type = models.CharField(
-        max_length=4,
+    id = models.CharField(max_length=31, primary_key=True)
+    full_type = models.CharField(max_length=31)
+    type = models.CharField(
+        max_length=2,
         choices=EventType.choices,
+    )
+    action = models.CharField(
+        max_length=2,
+        choices=Action.choices,
     )
     actor = models.ForeignKey(
         Actor,
@@ -51,5 +53,5 @@ class Event(models.Model):
         Repo,
         on_delete=models.CASCADE,
     )
-    payload = models.TextField()
     created_at = models.DateTimeField()
+    additional_info = models.TextField()
