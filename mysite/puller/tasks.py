@@ -47,7 +47,7 @@ class Puller:
             created_at = event["created_at"]
         )
         payload = event["payload"]
-        match e.type:
+        match e.full_type:
             case 'ForkEvent':
                 e.type = Event.EventType.Fork
             case 'IssueCommentEvent':
@@ -115,8 +115,11 @@ class Puller:
     def pull_event_data(self, batch_id, from_date, to_date):
         batch = Batch.objects.get(pk=batch_id)
         repo_paths = json.loads(batch.repo_paths)
+        intervals = json.loads(batch.time_intervals)
+        intervals.append([str(from_date), str(from_date)])
 
         date, success = from_date, True
+
         while date < to_date and success:
             events = []
             for h in range(0, 24):
@@ -150,11 +153,10 @@ class Puller:
                 print(f"{date} done: {len(events)} events")
                 Event.objects.bulk_create(events)
                 date += datetime.timedelta(days=1)
-        if from_date < date:
-            intervals = json.loads(batch.time_intervals)
-            intervals.append([str(from_date), str(date)])
-            batch.time_intervals = json.dumps(intervals)
-            batch.save()
+
+                intervals[-1][-1] = str(date)
+                batch.time_intervals = json.dumps(intervals)
+                batch.save()
 
 
 def check_conflict(repo_paths):
@@ -163,15 +165,15 @@ def check_conflict(repo_paths):
 
 
 def create_batch(repo_paths):
-    id = None
-    if check_conflict():
+    batch_id = None
+    if check_conflict(repo_paths):
         batch = Batch(
             repo_paths = json.dumps(repo_paths),
             time_intervals = json.dumps([])
         )
         batch.save()
-        id = batch.id
-    return id
+        batch_id = batch.id
+    return batch_id
 
 
 @shared_task
