@@ -112,17 +112,17 @@ class Puller:
                 return None
         return e
 
-    def pull_event_data(self, batch_id, from_date, to_date):
+    def pull_event_data(self, batch_id, from_date, from_date_h, to_date):
         batch = Batch.objects.get(pk=batch_id)
         repo_paths = json.loads(batch.repo_paths)
         intervals = json.loads(batch.time_intervals)
-        intervals.append([str(from_date), str(from_date)])
+        intervals.append([str(from_date), from_date_h, str(from_date), from_date_h])
 
-        date, success = from_date, True
+        date, h, success = from_date, from_date_h, True
 
         while date < to_date and success:
-            events = []
-            for h in range(0, 24):
+            while h < 24:
+                events = []
                 f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
                 url = f"https://data.gharchive.org/{f_name}.gz"
 
@@ -148,13 +148,15 @@ class Puller:
                         event_json = ""
                     except:
                         pass
-                print(f"{url} done")
-            if success:
-                print(f"{date} done: {len(events)} events")
                 Event.objects.bulk_create(events)
-                date += datetime.timedelta(days=1)
-
-                intervals[-1][-1] = str(date)
+                h += 1
+                intervals[-1][-1] = h
+                batch.time_intervals = json.dumps(intervals)
+                batch.save()
+                print(f"{url} done: {len(events)} events")
+            if success:
+                date, h = date + datetime.timedelta(days=1), 0
+                intervals[-1][-2], intervals[-1][-1] = str(date), h
                 batch.time_intervals = json.dumps(intervals)
                 batch.save()
 
@@ -177,6 +179,6 @@ def create_batch(repo_paths):
 
 
 @shared_task
-def pull_data(batch_id, from_date, to_date):
+def pull_data(batch_id, from_date, from_h, to_date):
     puller = Puller()
-    puller.pull_event_data(batch_id, from_date, to_date)
+    puller.pull_event_data(batch_id, from_date, from_h, to_date)
