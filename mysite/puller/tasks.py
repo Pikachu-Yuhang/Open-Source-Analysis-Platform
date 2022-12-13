@@ -1,5 +1,5 @@
 import datetime
-import gzip, json
+import gzip, json, os, shutil
 from urllib import request
 from celery import shared_task
 from github import Github
@@ -135,30 +135,36 @@ class Puller:
             while h < 24:
                 events = []
                 f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
-                url = f"https://data.gharchive.org/{f_name}.gz"
+                gz_name = f"{f_name}.gz"
+                url = f"https://data.gharchive.org/{gz_name}"
 
-                response, cnt = None, 0
-                while response is None and cnt < self.max_retry_cnt:
+                retrieved, cnt = False, 0
+                while not retrieved and cnt < self.max_retry_cnt:
                     try:
-                        response = self.opener.open(url)
+                        self.opener.retrieve(url, gz_name)
+                        retrieved = True
                     except:
                         cnt += 1
-                if response is None:
+                if not retrieved:
                     success = False
                     break
-                result = gzip.decompress(response.read()).decode("utf-8")
-                event_json = ""
-                for line in result.splitlines():
-                    event_json += line
-                    try:
-                        event = json.loads(event_json)
-                        if event["repo"]["name"] in repo_paths:
-                            e = Puller.json2model(event)
-                            if e is not None:
-                                events.append(e)
-                        event_json = ""
-                    except:
-                        pass
+                with gzip.open(gz_name, 'rb') as f_in, open(f_name, 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+                os.remove(gz_name)
+                with open(f_name, mode="r", encoding="utf-8") as f_in:
+                    event_json = ""
+                    for line in f_in:
+                        event_json += line
+                        try:
+                            event = json.loads(event_json)
+                            if event["repo"]["name"] in repo_paths:
+                                e = Puller.json2model(event)
+                                if e is not None:
+                                    events.append(e)
+                            event_json = ""
+                        except:
+                            pass
+                os.remove(f_name)
                 Event.objects.bulk_create(events)
                 h += 1
                 intervals[-1][-1] = h
