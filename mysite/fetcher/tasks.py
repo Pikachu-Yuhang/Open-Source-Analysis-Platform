@@ -14,7 +14,7 @@ class Fetcher:
     def update_record(self, repo_path, type):
         records, record = SnapshotCache.objects.filter(repo_name=repo_path, type=type), None
         if len(records) == 0:
-            record = SnapshotCache(repo_name=repo_path, type=type)
+            record = SnapshotCache(repo_name=repo_path, type=type, updated_at=datetime.datetime.now())
             record.save()
         else:
             record = records[0]
@@ -63,5 +63,5 @@ class Fetcher:
         pass
 
 
-TOKEN = "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"
+TOKEN = ""
 fetcher = Fetcher(TOKEN)
