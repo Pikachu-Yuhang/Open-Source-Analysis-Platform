@@ -1,5 +1,5 @@
 import datetime
-import gzip, json, multiprocessing, os, shutil
+import gzip, json, threading, os, shutil
 from urllib import request
 from celery import shared_task
 from github import Github
@@ -166,19 +166,19 @@ class Puller:
         date = from_date
 
         while date < to_date:
-            jobs, event_list, success_list = [], [], []
+            threads, event_list, success_list = [], [], []
             
             for h in range(0, 24):
                 f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
 
-                p = multiprocessing.Process(
+                thread = threading.Thread(
                     target=self.puller_hourly_event_date, 
                     args=(f_name, repo_paths, event_list, success_list)
                 )
-                jobs.append(p)
+                threads.append(thread)
 
-            for job in jobs: job.start()
-            for job in jobs: job.join()
+            for thread in threads: thread.start()
+            for thread in threads: thread.join()
 
             if len(success_list) == 24 and all(success_list):
                 print(f"{date} done: {len(event_list)} events")
