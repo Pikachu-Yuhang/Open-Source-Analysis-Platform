@@ -1,5 +1,5 @@
 import datetime
-import gzip, json, os, shutil
+import gzip, json, multiprocessing, os, shutil
 from urllib import request
 from celery import shared_task
 from github import Github
@@ -21,7 +21,6 @@ class Puller:
         version = "Wget/1.21.2"
 
     def __init__(self, max_retry_cnt=100):
-        self.opener = Puller.AppURLopener()
         self.max_retry_cnt = max_retry_cnt
 
     def get_actor(actor_json):
@@ -123,59 +122,73 @@ class Puller:
                 return None
         return e
 
-    def pull_event_data(self, batch_id, from_date, from_date_h, to_date):
+    def puller_hourly_event_date(self, f_name, repo_paths, event_list, success_list):
+        gz_name = f"{f_name}.gz"
+        url = f"https://data.gharchive.org/{gz_name}"
+        opener, retrieved, cnt = Puller.AppURLopener(), False, 0
+        
+        while not retrieved and cnt < self.max_retry_cnt:
+            try:
+                opener.retrieve(url, gz_name)
+                retrieved = True
+            except:
+                cnt += 1
+        if not retrieved:
+            success_list.append(False)
+            return
+
+        with gzip.open(gz_name, 'rb') as f_in, open(f_name, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+        os.remove(gz_name)
+        with open(f_name, mode="r", encoding="utf-8") as f_in:
+            event_json = ""
+            for line in f_in:
+                event_json += line
+                try:
+                    event = json.loads(event_json)
+                    if event["repo"]["name"] in repo_paths:
+                        e = Puller.json2model(event)
+                        if e is not None:
+                            event_list.append(e)
+                    event_json = ""
+                except:
+                    pass
+        success_list.append(True)
+        os.remove(f_name)
+
+
+    def pull_event_data(self, batch_id, from_date, to_date):
         batch = Batch.objects.get(pk=batch_id)
         repo_paths = json.loads(batch.repo_paths)
         intervals = json.loads(batch.time_intervals)
-        intervals.append([str(from_date), from_date_h, str(from_date), from_date_h])
+        intervals.append([str(from_date), str(from_date)])
 
-        date, h, success = from_date, from_date_h, True
+        date = from_date
 
-        while date < to_date and success:
-            while h < 24:
-                events = []
+        while date < to_date:
+            jobs, event_list, success_list = [], [], []
+            
+            for h in range(0, 24):
                 f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
-                gz_name = f"{f_name}.gz"
-                url = f"https://data.gharchive.org/{gz_name}"
 
-                retrieved, cnt = False, 0
-                while not retrieved and cnt < self.max_retry_cnt:
-                    try:
-                        self.opener.retrieve(url, gz_name)
-                        retrieved = True
-                    except:
-                        cnt += 1
-                if not retrieved:
-                    success = False
-                    break
-                with gzip.open(gz_name, 'rb') as f_in, open(f_name, 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-                os.remove(gz_name)
-                with open(f_name, mode="r", encoding="utf-8") as f_in:
-                    event_json = ""
-                    for line in f_in:
-                        event_json += line
-                        try:
-                            event = json.loads(event_json)
-                            if event["repo"]["name"] in repo_paths:
-                                e = Puller.json2model(event)
-                                if e is not None:
-                                    events.append(e)
-                            event_json = ""
-                        except:
-                            pass
-                os.remove(f_name)
-                Event.objects.bulk_create(events)
-                h += 1
-                intervals[-1][-1] = h
+                p = multiprocessing.Process(
+                    target=self.puller_hourly_event_date, 
+                    args=(f_name, repo_paths, event_list, success_list)
+                )
+                jobs.append(p)
+
+            for job in jobs: job.start()
+            for job in jobs: job.join()
+
+            if len(success_list) == 24 and all(success_list):
+                print(f"{date} done: {len(event_list)} events")
+                Event.objects.bulk_create(event_list)
+                date += datetime.timedelta(days=1)
+                intervals[-1][-1] = str(date)
                 batch.time_intervals = json.dumps(intervals)
                 batch.save()
-                print(f"{url} done: {len(events)} events")
-            if success:
-                date, h = date + datetime.timedelta(days=1), 0
-                intervals[-1][-2], intervals[-1][-1] = str(date), h
-                batch.time_intervals = json.dumps(intervals)
-                batch.save()
+            else:
+                break
 
 
 def check_conflict(repo_paths):
@@ -196,6 +209,6 @@ def create_batch(repo_paths):
 
 
 @shared_task
-def pull_data(batch_id, from_date, from_h, to_date):
+def pull_data(batch_id, from_date, to_date):
     puller = Puller()
-    puller.pull_event_data(batch_id, from_date, from_h, to_date)
+    puller.pull_event_data(batch_id, from_date, to_date)
