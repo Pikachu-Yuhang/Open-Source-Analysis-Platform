@@ -1,14 +1,7 @@
 from django.http import JsonResponse
 
 from puller.models import Event, Repo
-from puller.tasks import Fetcher
 
-# Snapshot data.
-def dummy(request, owner, repo):
-    return JsonResponse({})
-
-
-# Incremental data.
 def pull_request_per_month(request, owner, repo, year):
     full_name = f"{owner}/{repo}"
     repo = Repo.objects.get(full_name=full_name)

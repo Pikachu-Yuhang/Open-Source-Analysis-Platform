@@ -2,20 +2,9 @@ import datetime
 import gzip, json, threading, os, shutil
 from urllib import request
 from celery import shared_task
-from github import Github
 
 from puller.models import Actor, Batch, Event, Repo
 
-# Snapshot data.
-class Fetcher:
-    def __init__(self, token):
-        self.g = Github(token)
-
-    def what(self):
-        pass
-
-
-# Incremental data.
 class Puller:
     class AppURLopener(request.FancyURLopener):
         version = "Wget/1.21.2"
