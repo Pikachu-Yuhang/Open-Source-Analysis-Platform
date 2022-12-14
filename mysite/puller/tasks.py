@@ -1,5 +1,5 @@
 import datetime
-import gzip, json, threading, os, shutil
+import gzip, json, threading, os, queue, shutil
 from urllib import request
 from celery import shared_task
 
@@ -111,40 +111,49 @@ class Puller:
                 return None
         return e
 
-    def puller_hourly_event_date(self, f_name, repo_paths, event_list, success_list):
-        gz_name = f"{f_name}.gz"
-        url = f"https://data.gharchive.org/{gz_name}"
-        opener, retrieved, cnt = Puller.AppURLopener(), False, 0
-        
-        while not retrieved and cnt < self.max_retry_cnt:
-            try:
-                opener.retrieve(url, gz_name)
-                retrieved = True
-            except:
-                cnt += 1
-        if not retrieved:
-            success_list.append(False)
-            return
+    def producer(self, date, failure_list, q):
+        opener = Puller.AppURLopener()
+        for h in range(0, 24):
+            f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
+            gz_name = f"{f_name}.gz"
 
-        with gzip.open(gz_name, 'rb') as f_in, open(f_name, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-        os.remove(gz_name)
-        with open(f_name, mode="r", encoding="utf-8") as f_in:
-            event_json = ""
-            for line in f_in:
-                event_json += line
+            retrieved, cnt = False, 0
+            while not retrieved and cnt < self.max_retry_cnt:
                 try:
-                    event = json.loads(event_json)
-                    if event["repo"]["name"] in repo_paths:
-                        e = Puller.json2model(event)
-                        if e is not None:
-                            event_list.append(e)
-                    event_json = ""
+                    opener.retrieve(f"https://data.gharchive.org/{gz_name}", gz_name)
+                    retrieved = True
                 except:
-                    pass
-        success_list.append(True)
-        os.remove(f_name)
+                    cnt += 1
+            if retrieved:
+                q.put(f_name)
+            else:
+                failure_list.append(f_name)
 
+    def consumer(self, repo_paths, event_list, q):
+        while True:
+            f_name = q.get()
+            if not f_name:
+                q.task_done()
+                break
+            gz_name = f"{f_name}.gz"
+            with gzip.open(gz_name, 'rb') as f_in, open(f_name, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+            os.remove(gz_name)
+            with open(f_name, mode="r", encoding="utf-8") as f_in:
+                event_json = ""
+                for line in f_in:
+                    event_json += line
+                    try:
+                        event = json.loads(event_json)
+                        if event["repo"]["name"] in repo_paths:
+                            e = Puller.json2model(event)
+                            if e is not None:
+                                event_list.append(e)
+                        event_json = ""
+                    except:
+                        pass
+            os.remove(f_name)
+            q.task_done()
 
     def pull_event_data(self, batch_id, from_date, to_date):
         batch = Batch.objects.get(pk=batch_id)
@@ -154,30 +163,34 @@ class Puller:
 
         date = from_date
 
+        q, event_list = queue.Queue(), []
+        consumers = [threading.Thread(target=self.consumer, args=(repo_paths, event_list, q)) for i in range(6)]
+        for thread in consumers: thread.start()
+        
         while date < to_date:
-            threads, event_list, success_list = [], [], []
-            
-            for h in range(0, 24):
-                f_name = f"{date.year}-{str(date.month).zfill(2)}-{str(date.day).zfill(2)}-{h}.json"
+            failure_list = []
 
-                thread = threading.Thread(
-                    target=self.puller_hourly_event_date, 
-                    args=(f_name, repo_paths, event_list, success_list)
-                )
-                threads.append(thread)
+            producer = threading.Thread(target=self.producer, args=(date, failure_list, q))
+            producer.start()
+            producer.join()
 
-            for thread in threads: thread.start()
-            for thread in threads: thread.join()
-
-            if len(success_list) == 24 and all(success_list):
+            if len(failure_list) > 0:
+                print(failure_list)
+                break
+            else:
+                q.join()
                 print(f"{date} done: {len(event_list)} events")
                 Event.objects.bulk_create(event_list)
+                event_list.clear()
                 date += datetime.timedelta(days=1)
                 intervals[-1][-1] = str(date)
                 batch.time_intervals = json.dumps(intervals)
                 batch.save()
-            else:
-                break
+        for thread in consumers:
+            q.put("")
+        q.join()
+        for thread in consumers:
+            thread.join()
 
 
 def check_conflict(repo_paths):
