@@ -2,11 +2,15 @@ from django.db import models
 
 # Create your models here.
 
-class Overview(models.Model):
-    repo_name = models.CharField(max_length=63, primary_key=True)
-    star_cnt = models.IntegerField()
-    commit_cnt = models.IntegerField()
-    open_issue_cnt = models.IntegerField()
-    fork_cnt = models.IntegerField()
-    pr_creator_cnt = models.IntegerField()
+class SnapshotCache(models.Model):
+    class Type(models.TextChoices):
+        Issue = 'I',
+        PullRequest = 'P',
+        Other = 'O'
+    repo_name = models.CharField(max_length=63)
+    type = models.CharField(
+        max_length=1,
+        choices=Type.choices,
+    )
+    result = models.TextField()
     updated_at = models.DateTimeField()
