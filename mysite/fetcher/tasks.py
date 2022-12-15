@@ -34,6 +34,7 @@ class Fetcher:
         except:
             obj = Issue(
                 id=issue.id,
+                number=issue.number,
                 repo=self.get_repo_obj(issue.repository),
                 creator=self.get_actor_obj(issue.user),
                 commenter_ids=json.dumps([]),
@@ -51,6 +52,7 @@ class Fetcher:
         except:
             obj = PullRequest(
                 id=pr.id,
+                number=pr.number,
                 creator=self.get_actor_obj(pr.user),
                 reviewer_ids=json.dumps([]),
                 created_at=pr.created_at,
@@ -158,8 +160,8 @@ class Fetcher:
 
         repo = self.g.get_repo(basic_info.repo.full_name)
         for issue_obj in issue_objs:
-            issue = repo.get_issue(issue_obj.id)
-            if issue.updated_at > issue_obj.updated_at:
+            issue = repo.get_issue(issue_obj.number)
+            if issue.updated_at.timestamp() > issue_obj.updated_at.timestamp():
                 comments, commenter_ids = issue.get_comments(), []
                 # TODO: use self-implemented fetcher
                 for comment in comments:
@@ -186,16 +188,7 @@ class Fetcher:
             'comment_cnt': comment_cnt,
             'commenter_cnt': len(set(commenter_ids_dup)),
             'issue_by_company': self.group_by_company(creator_ids_dup),
-            'first_response_by_month': {k: [numpy.percentile(v, 25*i) for i in range(0, 5)] for k, v in month_to_frt}
-        }
-
-    def get_result_cache_other_info(self, basic_info:RepoBasicInfoCache):
-        repo = self.g.get_repo(basic_info.repo.full_name)
-        return {
-            'star_cnt': repo.stargazers_count,
-            'commit_cnt': repo.get_commits().totalCount,
-            'fork_cnt' : repo.forks_count,
-            'star_by_company': self.group_by_company(json.dumps(basic_info.ids))
+            'first_response_by_month': {k: [numpy.percentile(month_to_frt[k], 25*i) for i in range(0, 5)] for k in month_to_frt}
         }
 
     def get_result_cache_pr_info(self, basic_info:RepoBasicInfoCache):
@@ -204,8 +197,8 @@ class Fetcher:
 
         repo = self.g.get_repo(basic_info.repo.full_name)
         for pr_obj in pr_objs:
-            pr = repo.get_pull(pr_obj.id)
-            if pr.updated_at > pr_obj.updated_at:
+            pr = repo.get_pull(pr_obj.number)
+            if pr.updated_at.timestamp() > pr_obj.updated_at.timestamp():
                 reviews, reviewer_ids = pr.get_reviews(), []
                 # TODO: use self-implemented fetcher
                 for review in reviews:
@@ -230,10 +223,9 @@ class Fetcher:
 
     def update_result_cache(self, repo_path, result_type):
         # Call update_repo_basic_info_cache first.
-        issue_info, pull_info, star_info = (
+        issue_info, pull_info = (
             self.get_repo_basic_info_cache_obj(repo_path, RepoBasicInfoCache.InfoType.Issue),
-            self.get_repo_basic_info_cache_obj(repo_path, RepoBasicInfoCache.InfoType.PullRequest),
-            self.get_repo_basic_info_cache_obj(repo_path, RepoBasicInfoCache.InfoType.Star)
+            self.get_repo_basic_info_cache_obj(repo_path, RepoBasicInfoCache.InfoType.PullRequest)
         )
         record = self.get_result_cache_obj(repo_path, result_type)
         match result_type:
@@ -241,7 +233,12 @@ class Fetcher:
                 record.result = json.dumps(self.get_result_cache_issue_info(issue_info))
                 record.updated_time = issue_info.updated_time
             case ResultCache.Type.OtherInfo:
-                record.result = json.dumps(self.get_result_cache_other_info(star_info))
+                repo = self.g.get_repo(repo_path)
+                record.result = json.dumps({
+                    'star_cnt': repo.stargazers_count,
+                    'commit_cnt': repo.get_commits().totalCount,
+                    'fork_cnt' : repo.forks_count,
+                })
                 record.updated_time = datetime.datetime.now()
             case ResultCache.Type.PRInfo:
                 record.result = json.dumps(self.get_result_cache_pr_info(pull_info))
@@ -268,9 +265,6 @@ class Fetcher:
                     from_id = pr_ids[0]
                     new_pr_ids = self.get_prs_from(repo_path, from_id)
                 record.ids = json.dumps(new_pr_ids + pr_ids)
-            case RepoBasicInfoCache.InfoType.Star:
-                repo = self.g.get_repo(repo_path)
-                record.ids = json.dumps([usr.id for usr in repo.get_stargazers()])
         
         record.updated_time = datetime.datetime.now()
         record.save()

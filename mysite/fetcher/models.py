@@ -28,7 +28,6 @@ class RepoBasicInfoCache(models.Model):
     class InfoType(models.TextChoices):
         Issue = 'I'
         PullRequest = 'P'
-        Star = 'S'
     repo = models.ForeignKey(
         Repo,
         on_delete=models.CASCADE,
@@ -50,6 +49,7 @@ class Actor(models.Model):
 
 class Issue(models.Model):
     id = models.CharField(max_length=63, primary_key=True)
+    number = models.IntegerField()
     repo = models.ForeignKey(
         Repo,
         on_delete=models.CASCADE,
@@ -66,6 +66,7 @@ class Issue(models.Model):
 
 class PullRequest(models.Model):
     id = models.CharField(max_length=63, primary_key=True)
+    number = models.IntegerField()
     creator = models.ForeignKey(
         Actor,
         on_delete=models.CASCADE,
