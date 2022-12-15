@@ -13,5 +13,5 @@ def info(request, owner, repo, result_type):
 
 
 def update(request, owner, repo):
-    # TODO
+    fetcher.q.put(f"{owner}/{repo}")
     return HttpResponse("Update request receieved.")

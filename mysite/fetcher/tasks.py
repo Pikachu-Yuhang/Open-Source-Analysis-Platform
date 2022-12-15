@@ -1,4 +1,4 @@
-import datetime, json
+import datetime, json, queue
 import numpy
 from github import Github
 
@@ -8,6 +8,7 @@ class Fetcher:
     def __init__(self, token, fetch_limit=100):
         self.g = Github(token)
         self.fetch_limit = fetch_limit
+        self.q = queue.Queue()
 
     def get_repo_obj(self, repo):
         obj = None
@@ -269,6 +270,24 @@ class Fetcher:
         
         record.updated_time = datetime.datetime.now()
         record.save()
+
+    def update(self):
+        while True:
+            repo_path = self.q.get()
+            if not repo_path:
+                self.q.task_done()
+                break
+            
+            self.update_repo(repo_path)
+            self.q.task_done()
+
+    def update_repo(self, repo_path):
+        fetcher.update_repo_basic_info_cache(repo_path, RepoBasicInfoCache.InfoType.Issue)
+        fetcher.update_repo_basic_info_cache(repo_path, RepoBasicInfoCache.InfoType.PullRequest)
+
+        fetcher.update_result_cache(repo_path, ResultCache.Type.IssueInfo)
+        fetcher.update_result_cache(repo_path, ResultCache.Type.PRInfo)
+        fetcher.update_result_cache(repo_path, ResultCache.Type.OtherInfo)
 
 
 TOKEN = ""
