@@ -9,17 +9,15 @@ class Repo(models.Model):
 
 class ResultCache(models.Model):
     class Type(models.TextChoices):
-        CompanyInfo = 'Ci'
-        IssueOverview = 'Io'
-        IssueFirstResponseTime = 'Ifrt'
-        OtherInfo = 'Oi'
-        PROverview = 'PRo'
+        IssueInfo = 'I'
+        OtherInfo = 'O'
+        PRInfo = 'PR'
     repo = models.ForeignKey(
         Repo,
         on_delete=models.CASCADE,
     )
     type = models.CharField(
-        max_length=4,
+        max_length=2,
         choices=Type.choices,
     )
     result = models.TextField()
@@ -45,8 +43,8 @@ class RepoBasicInfoCache(models.Model):
 
 class Actor(models.Model):
     id = models.CharField(max_length=31, primary_key=True)
-    company = models.CharField(max_length=63)
-    email = models.CharField(max_length=63)
+    company = models.CharField(max_length=255, null=True)
+    email = models.CharField(max_length=255, null=True)
 
 
 class Issue(models.Model):
@@ -59,7 +57,7 @@ class Issue(models.Model):
         Actor,
         on_delete=models.CASCADE,
     )
-    commenter_ids = models.TextField()
+    commenter_ids = models.TextField() # with duplicates
     first_response_time = models.DateTimeField()
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
@@ -71,5 +69,6 @@ class PullRequest(models.Model):
         Actor,
         on_delete=models.CASCADE,
     )
-    reviewer_ids = models.TextField()
+    reviewer_ids = models.TextField() # with duplicates
+    created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
