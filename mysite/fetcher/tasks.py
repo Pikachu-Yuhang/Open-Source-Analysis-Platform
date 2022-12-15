@@ -2,7 +2,7 @@ import datetime, json
 import numpy
 from github import Github
 
-from .models import Actor, Issue, PullRequest, ResultCache, Repo, RepoBasicInfoCache
+from .models import Actor, CompanyNameMatch, Issue, PullRequest, ResultCache, Repo, RepoBasicInfoCache
 
 class Fetcher:
     def __init__(self, token, fetch_limit=100):
@@ -143,14 +143,15 @@ class Fetcher:
         obj = self.get_result_cache_obj(repo_path, type)
         return json.loads(obj.result), obj.updated_time
 
-    def get_company(actor:Actor):
-        company = actor.company # TODO
-        return company
-
     def group_by_company(self, actor_ids_dup):
+        company_name_map = {pair.name: pair.map_to for pair in CompanyNameMatch.objects.all()}
         id_to_actor_obj, res = {id: Actor.objects.get(pk=id) for id in set(actor_ids_dup)}, dict()
         for actor_id in actor_ids_dup:
-            k = Fetcher.get_company(id_to_actor_obj[actor_id])
+            actor_obj, k = id_to_actor_obj[actor_id], None
+            try:
+                k = company_name_map[k]
+            except:
+                k = actor_obj.company
             res[k] = res.setdefault(k, 0) + 1
         return res
 

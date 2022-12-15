@@ -74,3 +74,8 @@ class PullRequest(models.Model):
     reviewer_ids = models.TextField() # with duplicates
     created_at = models.DateTimeField()
     updated_at = models.DateTimeField()
+
+
+class CompanyNameMatch(models.Model):
+    name = models.CharField(max_length=255, primary_key=True)
+    map_to = models.CharField(max_length=255)
