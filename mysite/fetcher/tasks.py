@@ -5,8 +5,9 @@ from github import Github
 from .models import Actor, Issue, PullRequest, ResultCache, Repo, RepoBasicInfoCache
 
 class Fetcher:
-    def __init__(self, token):
+    def __init__(self, token, fetch_limit=100):
         self.g = Github(token)
+        self.fetch_limit = fetch_limit
 
     def get_repo_obj(self, repo):
         obj = None
@@ -80,8 +81,42 @@ class Fetcher:
             record.save()
         return record
 
+    def get_issues_at(self, repo_path:str, page_id:int):
+        repo = self.g.get_repo(repo_path)
+        all, res, next_page = repo.get_issues(state='all', sort='created', direction='asc'), [], page_id
+        page_issues = all.get_page(page_id)
+        if len(page_issues) > 0:
+            try:
+                for issue in page_issues:
+                    if issue.pull_request is None:
+                        self.get_issue_obj(issue)
+                        res.append(issue.id)
+                next_page += 1
+            except:
+                res.clear()
+        else:
+            next_page = -1
+        res.reverse()
+        return res, next_page
+
+    def get_prs_at(self, repo_path:str, page_id:int):
+        repo = self.g.get_repo(repo_path)
+        all, res, next_page = repo.get_pulls(state='all', sort='created', direction='asc'), [], page_id
+        page_prs = all.get_page(page_id)
+        if len(page_prs) > 0:
+            try:
+                for pr in page_prs:
+                    self.get_pr_obj(pr)
+                    res.append(pr.id)
+                next_page += 1
+            except:
+                res.clear()
+        else:
+            next_page = -1
+        res.reverse()
+        return res, next_page
+
     def get_issues_from(self, repo_path:str, from_id:str):
-        # TODO: use self-implemented fetcher
         repo = self.g.get_repo(repo_path)
         all, res = repo.get_issues(state='all', sort='created', direction='desc'), []
         for issue in all:
@@ -93,7 +128,6 @@ class Fetcher:
         return res
 
     def get_prs_from(self, repo_path:str, from_id:str):
-        # TODO: use self-implemented fetcher
         repo = self.g.get_repo(repo_path)
         all, res = repo.get_pulls(state='all', sort='created', direction='desc'), []
         for pull in all:
@@ -219,16 +253,20 @@ class Fetcher:
 
         match info_type:
             case RepoBasicInfoCache.InfoType.Issue:
-                issue_ids, from_id = json.loads(record.ids), ''
-                if len(issue_ids) > 0:
+                issue_ids, page, new_issue_ids = json.loads(record.ids), record.next_page, None
+                if page >= 0:
+                    new_issue_ids, record.next_page = self.get_issues_at(repo_path, page)
+                else:
                     from_id = issue_ids[0]
-                new_issue_ids = self.get_issues_from(repo_path, from_id)
+                    new_issue_ids = self.get_issues_from(repo_path, from_id)
                 record.ids = json.dumps(new_issue_ids + issue_ids)
             case RepoBasicInfoCache.InfoType.PullRequest:
-                pr_ids, from_id = json.loads(record.ids), ''
-                if len(pr_ids) > 0:
+                pr_ids, page, new_pr_ids = json.loads(record.ids), record.next_page, None
+                if page >= 0:
+                    new_pr_ids, record.next_page = self.get_prs_at(repo_path, page)
+                else:
                     from_id = pr_ids[0]
-                new_pr_ids = self.get_prs_from(repo_path, from_id)
+                    new_pr_ids = self.get_prs_from(repo_path, from_id)
                 record.ids = json.dumps(new_pr_ids + pr_ids)
             case RepoBasicInfoCache.InfoType.Star:
                 repo = self.g.get_repo(repo_path)

@@ -39,6 +39,7 @@ class RepoBasicInfoCache(models.Model):
     )
     ids = models.TextField()
     updated_time = models.DateTimeField()
+    next_page = models.IntegerField(default=0) # for issue and pr pulling
 
 
 class Actor(models.Model):
