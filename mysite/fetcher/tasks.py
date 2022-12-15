@@ -231,7 +231,7 @@ class Fetcher:
         record = self.get_result_cache_obj(repo_path, result_type)
         match result_type:
             case ResultCache.Type.IssueInfo:
-                record.result = json.dumps(self.get_result_cache_issue_info(issue_info))
+                record.result = json.dumps(self.get_result_cache_issue_info(issue_info), default=str)
                 record.updated_time = issue_info.updated_time
             case ResultCache.Type.OtherInfo:
                 repo = self.g.get_repo(repo_path)
@@ -242,7 +242,7 @@ class Fetcher:
                 })
                 record.updated_time = datetime.datetime.now()
             case ResultCache.Type.PRInfo:
-                record.result = json.dumps(self.get_result_cache_pr_info(pull_info))
+                record.result = json.dumps(self.get_result_cache_pr_info(pull_info), default=str)
                 record.updated_time = pull_info.updated_time
         record.save()
 
