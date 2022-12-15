@@ -63,8 +63,11 @@ class Fetcher:
         return obj
 
     def get_result_cache_obj(self, repo_path:str, type:ResultCache.Type):
-        repo = self.g.get_repo(repo_path)
-        repo_obj = self.get_repo_obj(repo)
+        repo_objs, repo_obj = Repo.objects.filter(full_name=repo_path), None
+        if len(repo_objs) == 0:
+            raise Exception()
+        repo_obj = repo_objs[0]
+            
         records, record = ResultCache.objects.filter(repo=repo_obj, type=type), None
         if len(records) > 0:
             record = records[0]
@@ -141,8 +144,11 @@ class Fetcher:
         return res
 
     def get_result_cache(self, repo_path:str, type:ResultCache.Type):
-        obj = self.get_result_cache_obj(repo_path, type)
-        return json.loads(obj.result), obj.updated_time
+        try:
+            obj = self.get_result_cache_obj(repo_path, type)
+            return json.loads(obj.result), obj.updated_time
+        except:
+            return '', None
 
     def group_by_company(self, actor_ids_dup):
         company_name_map = {pair.name: pair.map_to for pair in CompanyNameMatch.objects.all()}
