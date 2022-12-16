@@ -16,7 +16,8 @@ def info(request, owner, repo, result_type):
         return HttpResponseNotFound
 
 
-@login_required
 def update(request, owner, repo):
+    if not request.user.is_authenticated:
+        return HttpResponse("Login required.")
     fetcher.q.put(f"{owner}/{repo}")
     return HttpResponse("Update request receieved.")

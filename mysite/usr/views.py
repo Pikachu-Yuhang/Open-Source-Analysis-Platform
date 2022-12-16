@@ -1,6 +1,6 @@
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse
 
 # Create your views here.
 def register(request, usr_name, email, password):
@@ -15,3 +15,8 @@ def usr_login(request, usr_name, password):
         return HttpResponse("Success!")
     else:
         return HttpResponse("Failed!")
+
+
+def usr_logout(request):
+    logout(request)
+    return HttpResponse("Success!")
