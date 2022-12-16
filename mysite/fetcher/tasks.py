@@ -328,12 +328,15 @@ class Fetcher:
             self.q.task_done()
 
     def update_repo(self, repo_path):
-        fetcher.update_repo_basic_info_cache(repo_path, RepoBasicInfoCache.InfoType.Issue)
-        fetcher.update_repo_basic_info_cache(repo_path, RepoBasicInfoCache.InfoType.PullRequest)
+        try:
+            fetcher.update_repo_basic_info_cache(repo_path, RepoBasicInfoCache.InfoType.Issue)
+            fetcher.update_repo_basic_info_cache(repo_path, RepoBasicInfoCache.InfoType.PullRequest)
 
-        fetcher.update_result_cache(repo_path, ResultCache.Type.IssueInfo)
-        fetcher.update_result_cache(repo_path, ResultCache.Type.PRInfo)
-        fetcher.update_result_cache(repo_path, ResultCache.Type.OtherInfo)
+            fetcher.update_result_cache(repo_path, ResultCache.Type.IssueInfo)
+            fetcher.update_result_cache(repo_path, ResultCache.Type.PRInfo)
+            fetcher.update_result_cache(repo_path, ResultCache.Type.OtherInfo)
+        except:
+            pass
 
 
 TOKEN = ""
