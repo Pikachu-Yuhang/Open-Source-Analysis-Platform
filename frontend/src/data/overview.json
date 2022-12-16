@@ -1,0 +1,41 @@
+{
+  "overview": [
+    {
+      "first": "",
+      "second": "Pytorch",
+      "third": "Tensorflow"
+    },
+    {
+      "first": "Stars",
+      "second": 63596,
+      "third": 186311
+    },
+    {
+      "first": "Commits",
+      "second": 242293,
+      "third": 138492
+
+    },
+    {
+      "first": "Issues",
+      "second": 28953,
+      "third": 36056
+    },
+    {
+      "first": "Forks",
+      "second": 16980,
+      "third": 87547
+    },
+    {
+      "first": "Pull Requests",
+      "second": 3543,
+      "third": 4479
+
+    },
+    {
+      "first": "Language",
+      "second": "C++",
+      "third": "C++"
+    }
+  ]
+}
