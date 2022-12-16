@@ -33,6 +33,7 @@ ALLOWED_HOSTS = ['*']
 INSTALLED_APPS = [
     'puller.apps.PullerConfig',
     'fetcher.apps.FetcherConfig',
+    'usr.apps.UsrConfig',
     'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
