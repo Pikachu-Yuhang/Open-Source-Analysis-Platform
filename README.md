@@ -1,6 +1,6 @@
 # README
 
-![banner](.\img\banner.jpg)
+![banner](./img/banner.jpg)
 
 <center>
     <img src=https://img.shields.io/badge/lisence-GPL3-3B9DDF?style=flat-square>
