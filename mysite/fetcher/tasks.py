@@ -1,12 +1,43 @@
 import datetime, json, queue
+import requests
 import numpy
 from github import Github
 
 from .models import Actor, CompanyNameMatch, Issue, PullRequest, ResultCache, Repo, RepoBasicInfoCache
 
 class Fetcher:
+    class LightweightFetcher:
+        def __init__(self, token):
+            self.request_headers = {
+                'Accept': 'application/vnd.github+json', 
+                'Authorization': f'Bearer {token}',
+                'X-GitHub-Api-Version': '2022-11-28'
+            }
+            self.per_page = 100
+
+        def fetch_items(self, partial_url):
+            page_number, res = 0, []
+            while True:
+                url = f"{partial_url}?per_page={self.per_page}&page={page_number}"
+                r = requests.get(url, headers=self.request_headers)
+                arr = r.json()
+                if len(arr) == 0:
+                    break
+                res += arr
+                page_number += 1
+            return res
+        
+        def fetch_issue_comments(self, repo_path, issue_number):
+            url = f"https://api.github.com/repos/{repo_path}/issues/{issue_number}/comments"
+            return self.fetch_items(url)
+
+        def fetch_pr_reviews(self, repo_path, pr_number):
+            url = f"https://api.github.com/repos/{repo_path}/pulls/{pr_number}/reviews"
+            return self.fetch_items(url)
+
     def __init__(self, token, fetch_limit=100):
         self.g = Github(token)
+        self.light_weight_fetcher = Fetcher.LightweightFetcher(token)
         self.fetch_limit = fetch_limit
         self.q = queue.Queue()
 
@@ -162,6 +193,13 @@ class Fetcher:
             res[k] = res.setdefault(k, 0) + 1
         return res
 
+    def create_usr_if_needed(self, usr_json):
+        try:
+            Actor.objects.get(pk=usr_json["id"])
+        except:
+            usr = self.g.get_user(usr_json["login"])
+            self.get_actor_obj(usr)
+
     def get_result_cache_issue_info(self, basic_info:RepoBasicInfoCache):
         issue_ids = json.loads(basic_info.ids)
         issue_objs = Issue.objects.filter(pk__in=issue_ids)
@@ -170,14 +208,15 @@ class Fetcher:
         for issue_obj in issue_objs:
             issue = repo.get_issue(issue_obj.number)
             if issue.updated_at.timestamp() > issue_obj.updated_at.timestamp():
-                comments, commenter_ids = issue.get_comments(), []
-                # TODO: use self-implemented fetcher
+                comments, commenter_ids = self.light_weight_fetcher.fetch_issue_comments(basic_info.repo.full_name, issue_obj.number), []
                 for comment in comments:
-                    commenter_ids.append(comment.user.id)
-                    if comment.created_at < issue_obj.first_response_time:
-                        issue_obj.first_response_time = comment.created_at # robust
+                    usr_json = comment["user"]
+                    self.create_usr_if_needed(usr_json)
+                    commenter_ids.append(usr_json["id"])
+                    if comment["created_at"] < issue_obj.first_response_time:
+                        issue_obj.first_response_time = comment["created_at"] # robust
                 issue_obj.commenter_ids = json.dumps(commenter_ids)
-                issue_obj.updated_at = issue_obj.updated_at
+                issue_obj.updated_at = issue.updated_at
                 issue_obj.save()
         
         creator_ids_dup, comment_cnt, commenter_ids_dup, month_to_frt = [], 0, [], dict()
@@ -207,10 +246,11 @@ class Fetcher:
         for pr_obj in pr_objs:
             pr = repo.get_pull(pr_obj.number)
             if pr.updated_at.timestamp() > pr_obj.updated_at.timestamp():
-                reviews, reviewer_ids = pr.get_reviews(), []
-                # TODO: use self-implemented fetcher
+                reviews, reviewer_ids = self.light_weight_fetcher.fetch_pr_reviews(basic_info.repo.full_name, pr_obj.number), []
                 for review in reviews:
-                    reviewer_ids.append(review.user.id)
+                    usr_json = review["user"]
+                    self.create_usr_if_needed(usr_json)
+                    reviewer_ids.append(usr_json["id"])
                 pr_obj.reviewer_ids = json.dumps(reviewer_ids)
                 pr_obj.updated_at = pr.updated_at
                 pr_obj.save()
@@ -298,3 +338,4 @@ class Fetcher:
 
 TOKEN = ""
 fetcher = Fetcher(TOKEN)
+fetcher.update()
