@@ -1,4 +1,4 @@
-import datetime, json, queue
+import datetime, json, queue, threading
 import requests
 import numpy
 from github import Github
@@ -338,4 +338,6 @@ class Fetcher:
 
 TOKEN = ""
 fetcher = Fetcher(TOKEN)
-fetcher.update()
+
+thread = threading.Thread(target=fetcher.update, args=())
+thread.start()
